@@ -1,0 +1,112 @@
+#include <Servo.h>
+Servo Barrier;
+
+// Name of input Pins//
+const int Button=2; //Pin connected to button
+
+//Name of output Pins//
+const int LedRed=3; //pin to red led(traffic)
+const int LedGreen=4; // green led (traffic)
+const int LedRed2=5; // red led(ped)
+const int LedGreen2=7; //green led(ped)
+const int LedYellow=6; // yellow led (traffic)
+
+int State=0; // state machine to control the automatism
+int Pos = 0;//Variable to store the servo Position
+int PreviousTime=0; // Variable to store the previous time
+int ElapsedTime=0; // Variable to store the total elapsed time
+boolean Pressed=LOW; // Variable to store if the button has been pressed;
+int lag=2000; // delay 2 seconds
+
+// Configure first loop
+void setup(){
+  Serial.begin(9600);
+  Barrier.attach(9);
+  
+  //Set Output pins//
+  pinMode(LedRed,OUTPUT); 
+  pinMode(LedGreen,OUTPUT); 
+  pinMode(LedRed2,OUTPUT); 
+  pinMode(LedGreen2,OUTPUT);
+  pinMode (LedYellow, OUTPUT);
+  
+  
+  //Set Input pins//
+  pinMode(Button,INPUT); 
+  
+  
+  //Set Default state output//
+  digitalWrite(LedRed,HIGH); 
+  digitalWrite(LedGreen,LOW);  
+  digitalWrite(LedRed2,LOW);
+  digitalWrite(LedGreen2,HIGH);
+  Barrier.write(0); //Move the barrier to the open Position
+}
+
+// Here starts main loop
+void loop(){
+  ElapsedTime=millis(); //save elapsed time using fuction millis()
+  switch(State){ // activate the state machine
+    case 0: //On the first state we check the button state
+      if (Pressed==LOW){ //If the button hasn't been press
+        Pressed=digitalRead(Button); //store the current state of the button on the variable
+        Serial.println("Waiting for button pulse"); //Print on serial that we are waiting for the button being press
+      }
+      if (Pressed==HIGH){  //If button has been pressed
+        Pressed=LOW;
+        Serial.println("The button has been pressed"); //We prent that the button has been pressed
+        State++; //We enable the next state
+      }
+    break;//End of state 0
+    
+    case 1: //State 1 the barrier is being closed
+      Serial.println("Closing Barrier..."); //We write on serial that the barrier is being opened
+      for(Pos = 0; Pos <= 90; Pos ++){ //Until the barrier is fully closed (90º)..
+      	Barrier.write(Pos); //close 1 degree every time the loop until barrier is fully closed
+      	delay(10); //Wait 10 ms between every loop 
+      }
+      PreviousTime=ElapsedTime; //Store the elapsed time to the previous time;
+      State++; //Once the barrier is closed we enable the next state
+    break;//End of state 1
+    
+    case 2: //State 2 the barrier is closed for 2 seconds
+      Serial.println("The barrier is close.. DO NOT PASS");
+      digitalWrite(LedRed,LOW); //OFF red light
+      digitalWrite(LedGreen,HIGH);//ON green light
+      digitalWrite(LedRed2,HIGH);
+      digitalWrite(LedGreen2,LOW);
+    
+      if((ElapsedTime-PreviousTime)<=2000){ //check if 2 seconds have passed
+     	Serial.print("Waiting until 2 second have passed. Count down: "); //Print current count down
+      	Serial.println((ElapsedTime-PreviousTime)/1000); //Current countdown is equal current program time (ellapsed time) less previous time divided by 1000 to convert in seconds
+      }
+      if((ElapsedTime-PreviousTime)>2000){ //Check that 2 seconds have passed
+    	State++; // Once the time has passed we switch to next state
+      }
+    break; //End of state 2
+    
+    case 3: //State 3 the barrier is being open
+     digitalWrite(LedRed2,LOW); //ON the red light2(ped)
+	 digitalWrite(LedGreen,LOW); //OFF green light
+     digitalWrite(LedRed,HIGH);//ON red light
+      for (int i = 0; i<=2; i++) //theree times yellow blinked 
+     { 
+
+      digitalWrite(LedYellow, 1);
+      delay(lag/2); 
+      digitalWrite(LedYellow, 0); 
+      delay(lag/4);
+      
+     }
+       digitalWrite(LedGreen2,HIGH);//ON green light2(ped)
+     
+      Serial.println("Barrier is open.. PASS NOW"); //We write on serial that the barrier is being closed
+      for(Pos = 90; Pos >= 0; Pos --){ //Until the barrier is fully closed (0º)..
+      	Barrier.write(Pos); //Close 1 degree every time the loop until barrier is fully closed
+      	delay(10); //Wait 10 ms between every loop in the for
+      }
+      State=0;; //Once the barrier is open go back to the standby state
+    break; //End of state 3
+ 
+  }
+}
